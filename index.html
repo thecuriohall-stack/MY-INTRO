@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hardware Diagnostics & Reverse Engineering Portfolio</title>
+    <style>
+        /* Modern Cyberpunk / Industrial Design Tokens */
+        :root {
+            --bg-color: #030305;
+            --card-bg: rgba(12, 12, 15, 0.85);
+            --card-hover: rgba(20, 20, 25, 0.95);
+            --accent-neon: #00f0ff; /* Electric Cyber Cyan */
+            --accent-glow: rgba(0, 240, 255, 0.2);
+            --text-primary: #ffffff; 
+            --text-secondary: #e4e4e7; 
+            --border-line: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Reset & Global Body Setup */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.8;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* AMBIENT DYNAMIC BACKGROUND ELEMENTS */
+        .bg-layer-ambient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            pointer-events: none;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            opacity: 0.08;
+        }
+
+        .bg-layer-ambient img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(100%) contrast(140%);
+        }
+
+        .bg-shield-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+            background: linear-gradient(to bottom, rgba(3, 3, 5, 0.92), rgba(5, 5, 8, 0.97));
+            backdrop-filter: blur(25px);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+        }
+
+        /* FIXED TOP-LEFT NAVIGATION BAR */
+        header {
+            position: fixed;
+            top: 25px; 
+            left: 25px; 
+            pointer-events: none; 
+            z-index: 1000;
+        }
+
+        nav {
+            display: flex;
+            background: rgba(12, 12, 15, 0.85);
+            padding: 12px 24px;
+            border-radius: 50px; 
+            border: 1px solid var(--border-line);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            gap: 1.4rem;
+            pointer-events: auto; 
+        }
+
+        /* CIRCULAR NAVIGATION BUTTON STYLES */
+        .nav-btn {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 48px !important;
+            height: 48px !important;
+            border-radius: 50% !important; 
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid var(--border-line) !important;
+            cursor: pointer;
+            text-decoration: none !important;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        .nav-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--text-secondary);
+            transition: fill 0.3s ease;
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            background-color: var(--accent-neon) !important;
+            border-color: var(--accent-neon) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 0 18px var(--accent-glow);
+        }
+
+        .nav-btn:hover svg, .nav-btn.active svg {
+            fill: #030305; 
+        }
+
+        /* Tooltips */
+        .nav-btn::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: -35px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.85);
+            background: #0c0c0f;
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-line);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .nav-btn:hover::after {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+
+        /* SINGLE PAGE APPLICATION SWITCHING ENGINE Rules */
+        .spa-page {
+            display: none; 
+            animation: pageSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            padding: 7rem 0 10rem 0;
+            min-height: 100vh;
+        }
+
+        .spa-page.active-page {
+            display: block; 
+        }
+
+        @keyframes pageSlideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Layout Component Structures */
+        section {
+            padding: 6rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        section:last-child { border: none; }
+
+        .section-header-title {
+            font-size: 2.8rem;
+            margin-bottom: 2.5rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            text-transform: uppercase;
+        }
+
+        .section-header-title span { color: var(--accent-neon); }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        /* Image Viewports */
+        .image-viewport {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-line);
+            height: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+        }
+
+        .image-viewport img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        .image-viewport:hover img { transform: scale(1.04); }
+
+        /* Typography & Callout Elements */
+        p { font-size: 1.1rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
+        
+        .highlight-text {
+            color: var(--text-primary);
+            font-weight: 700;
+            border-left: 4px solid var(--accent-neon);
+            padding-left: 1.5rem;
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            background: rgba(0, 240, 255, 0.02);
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Card and Metrics Grid Designs */
+        .card-cluster {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .interactive-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-line);
+            padding: 3rem 2rem;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .interactive-card:hover {
+            border-color: var(--accent-neon);
+            background: var(--card-hover);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 240, 255, 0.05);
+        }
+
+        .card-index {
+            font-family: monospace;
+            color: var(--accent-neon);
+            font-weight: 800;
+            margin-bottom: 1rem;
+            letter-spacing: 1px;
+        }
+
+        /* Technical Metric Tables */
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            background: rgba(10, 10, 12, 0.6);
+            border: 1px solid var(--border-line);
+        }
+
+        .matrix-table th, .matrix-table td {
+            padding: 1.2rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .matrix-table th {
+            background: rgba(0, 240, 255, 0.05);
+            color: var(--accent-neon);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Hero Layout Components */
+        .hero-banner {
+            padding: 6rem 0 2rem 0;
+            max-width: 850px;
+        }
+
+        .tagline-badge {
+            display: inline-block;
+            background: rgba(0, 240, 255, 0.15);
+            color: #00f0ff;
+            padding: 0.6rem 1.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(0, 240, 255, 0.4);
+        }
+
+        .hero-banner h1 {
+            font-size: 4.5rem;
+            line-height: 1.1;
+            margin-bottom: 2.5rem;
+            font-weight: 900;
+            letter-spacing: -2px;
+        }
+
+        .hero-banner h1 span { color: var(--accent-neon); }
+        .hero-banner p { font-size: 1.4rem; margin-bottom: 3rem; color: var(--text-secondary); }
+
+        /* Action Buttons */
+        .action-container { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .btn {
+            display: inline-block;
+            padding: 1.1rem 2.5rem;
+            border-radius: 6px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            border: none;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: #00f0ff;
+            color: #030305;
+            box-shadow: 0 4px 20px rgba(0, 240, 255, 0.25);
+        }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0, 240, 255, 0.45); }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.03);
+            color: #ffffff;
+            border: 2px solid #ffffff;
+        }
+        .btn-secondary:hover { border-color: #00f0ff; color: #00f0ff; transform: translateY(-3px); }
+
+        /* Forms Elements */
+        .contact-form-layout {
+            background: var(--card-bg);
+            border: 1px solid var(--border-line);
+            padding: 4rem;
+            border-radius: 8px;
+            backdrop-filter: blur(15px);
+            margin-top: 2rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .field-group { display: flex; flex-direction: column; }
+        .field-group label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-neon);
+            margin-bottom: 0.8rem;
+            font-weight: 700;
+        }
+
+        .field-group input, .field-group textarea {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--border-line);
+            padding: 1.2rem;
+            color: white;
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        .field-group input:focus, .field-group textarea:focus { outline: none; border-color: var(--accent-neon); }
+
+        /* Footer */
+        footer {
+            padding: 4rem 0;
+            text-align: center;
+            border-top: 1px solid var(--border-line);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            background: #030305;
+        }
+
+        @media (max-width: 992px) {
+            .grid-2, .form-row { grid-template-columns: 1fr; gap: 2.5rem; }
+            .hero-banner h1 { font-size: 3.2rem; }
+            header { left: 50%; transform: translateX(-50%); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-layer-ambient">
+        <img src="https://images.unsplash.com/photo-1555680202-c86f0e12f086?auto=format&fit=crop&w=600&q=80" alt="Lab Space Asset">
+        <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80" alt="Hardware Chip Asset">
+        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80" alt="Trace Pattern Asset">
+        <img src="https://images.unsplash.com/photo-1555680202-c86f0e12f086?auto=format&fit=crop&w=600&q=80" alt="Lab Space Asset">
+    </div>
+    <div class="bg-shield-overlay"></div>
+
+    <header>
+        <nav>
+            <a href="#" class="nav-btn active" data-target="home" data-tooltip="Home Core">
+                <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            </a>
+            <a href="#" class="nav-btn" data-target="portfolio" data-tooltip="Portfolio Vault">
+                <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+            </a>
+            <a href="#" class="nav-btn" data-target="cases" data-tooltip="Case Logs">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            </a>
+            <a href="#" class="nav-btn" data-target="contact" data-tooltip="Contact Comms">
+                <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            </a>
+        </nav>
+    </header>
+
+    <main id="home" class="spa-page container active-page">
+        <section class="hero-banner" style="border:none;">
+            <span class="tagline-badge">Hardware Diagnostics & Reverse Engineering</span>
+            <h1>Extracting System Logic From <span>Raw Silicon</span>.</h1>
+            <p>I isolate, disassemble, and structurally audit proprietary hardware systems—mapping multi-layer printed circuits to unlock foundational machine intelligence from closed ecosystems.</p>
+            <div class="action-container">
+                <button class="btn btn-primary navigate-action-btn" data-dest="portfolio">Inspect Core Portfolio</button>
+                <button class="btn btn-secondary navigate-action-btn" data-dest="cases">Analyze Deep Investigations</button>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-header-title">Operational <span>Focus Areas</span></h2>
+            <p>True hardware discovery relies on systematic, zero-compromise analysis protocols. I work across the physical layer to extract internal data logic directly from live components.</p>
+            <div class="card-cluster">
+                <div class="interactive-card">
+                    <div class="card-index">01 // SILICON EXTRACTION</div>
+                    <h4 style="font-size:1.4rem; margin-bottom:1rem;">Non-Volatile Memory Extraction</h4>
+                    <p style="font-size:1rem;">Desoldering and targeting flash memory structures using precise custom logical frameworks to copy embedded file structures directly from storage devices.</p>
+                </div>
+                <div class="interactive-card">
+                    <div class="interactive-card-inner"></div>
+                    <div class="card-index">02 // BUS INTERCEPTIONS</div>
+                    <h4 style="font-size:1.4rem; margin-bottom:1rem;">High-Speed Signaling Analysis</h4>
+                    <p style="font-size:1rem;">Monitoring system logic lines, circuit traces, and diagnostic arrays using logic analyzers to decipher internal protocols and communications.</p>
+                </div>
+                <div class="interactive-card">
+                    <div class="card-index">03 // HARDWARE HARDENING</div>
+                    <h4 style="font-size:1.4rem; margin-bottom:1rem;">Physical Fault Evaluation</h4>
+                    <p style="font-size:1rem;">Stressing and evaluating hardware systems against trace manipulation, clock variations, and physical interface bypass techniques.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="portfolio" class="spa-page container">
+        <section style="border:none; padding-top:0;">
+            <h2 class="section-header-title">Technical <span>Profile Architecture</span></h2>
+            <div class="grid-2">
+                <div class="about-text">
+                    <p class="highlight-text">While standard consumer profiles look at applications, I investigate technology from the microchip layout upward.</p>
+                    <p>My work centers on advanced reverse engineering: performing clean micro-disassemblies on complex printed circuits to track active logic lines, isolate hidden test pads, and extract secure machine firmware directly from proprietary chips.</p>
+                    <p>Every piece of hardware behaves according to real physical choices made by engineers. By lifting protective shields and auditing component routing pathways, I make hidden layouts legible.</p>
+                </div>
+                <div class="image-viewport">
+                    <img src="https://images.unsplash.com/photo-1555680202-c86f0e12f086?auto=format&fit=crop&w=600&q=80" alt="Lab Space Asset>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-header-title">The Analysis <span>Pipeline</span></h2>
+            <p>Every targeted physical teardown moves cleanly through three mandatory processing sequences:</p>
+            <div class="card-cluster">
+                <div class="interactive-card">
+                    <div class="card-index">PHASE_01</div>
+                    <h4 style="font-size:1.3rem; margin-bottom:1rem;">Physical Layer Deconstruction</h4>
+                    <p style="font-size:1rem;">Defeating structural component resins, security enclosures, and non-standard mechanical fasteners without destroying critical interior circuits.</p>
+                </div>
+                <div class="interactive-card">
+                    <div class="card-index">PHASE_02</div>
+                    <h4 style="font-size:1.3rem; margin-bottom:1rem;">Subsystem Trace Auditing</h4>
+                    <p style="font-size:1rem;">Locating discrete application processors, logging component tracking lines, and mapping critical signal pathways across multi-layer designs.</p>
+                </div>
+                <div class="interactive-card">
+                    <div class="card-index">PHASE_03</div>
+                    <h4 style="font-size:1.3rem; margin-bottom:1rem;">Diagnostic Interfacing</h4>
+                    <p style="font-size:1rem;">Identifying debugging structures, tapping engineering test pads, and intercepting live interface lines to observe device behavior.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2 class="section-header-title">Hardware <span>Capabilities Matrix</span></h2>
+            <p>An ongoing look at the physical interface methods and technical standards used during diagnostic processes:</p>
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Interface Target</th>
+                        <th>Analysis Vector</th>
+                        <th>Diagnostic Equipment Array</th>
+                        <th>Security Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UART / Serial Ports</td>
+                        <td>Root Terminal Extraction</td>
+                        <td>USB-to-TTL Converters / Signal Monitoring</td>
+                        <td style="color:var(--accent-neon); font-weight:700;">ACCESSED</td>
+                    </tr>
+                    <tr>
+                        <td>SPI / I2C Buses</td>
+                        <td>Live Storage Chip Sniffing</td>
+                        <td>Multi-Channel High-Speed Logic Analyzers</td>
+                        <td style="color:var(--accent-neon); font-weight:700;">DECRYPTED</td>
+                    </tr>
+                    <tr>
+                        <td>JTAG Interfaces</td>
+                        <td>On-Chip Memory Debugging</td>
+                        <td>Hardware Emulators / Boundary Scan Tools</td>
+                        <td style="color:var(--accent-neon); font-weight:700;">BYPASSED</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2 class="section-header-title">Laboratory <span>Image Vault</span></h2>
+            <p>High-magnification system logs detailing circuit configurations and experimental development environments:</p>
+            <div class="card-cluster" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                <div class="image-viewport" style="height:280px;"><img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80" alt="Microprocessor Assembly"></div>
+                <div class="image-viewport" style="height:280px;"><img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80" alt="Resistor Configuration Array"></div>
+                <div class="image-viewport" style="height:280px;"><img src="https://images.unsplash.com/photo-1555680202-c86f0e12f086?auto=format&fit=crop&w=600&q=80" alt="Hardware Laboratory Station"></div>
+            </div>
+        </section>
+    </div>
+
+    <div id="cases" class="spa-page container">
+        <section style="border:none; padding-top:0;">
+            <h2 class="section-header-title">Case <span>Investigations Archive</span></h2>
+            <p class="highlight-text">Documented hardware extraction and analysis operations.</p>
+            <p>These case logs outline my technical approach to evaluating, accessing, and reverse engineering proprietary hardware electronics under lab conditions.</p>
+        </section>
+
+        <section style="padding-top:0;">
+            <div class="card-cluster" style="grid-template-columns: 1fr;">
+                <div class="interactive-card" style="padding:4rem 3rem;">
+                    <div class="card-index">CASE_LOG #402 // STORAGE INTERCEPTION</div>
+                    <h3 style="font-size:1.8rem; margin-bottom:1rem; color:white;">Enterprise Gateway Flash Memory Extraction</h3>
+                    <p style="margin-bottom:2rem;">This operation targeted the storage structures of an encrypted enterprise network edge gateway. By using precise hot-air rework techniques, I safely extracted a dense TSOP-48 flash chip from the target assembly without introducing thermal damage to surrounding elements.</p>
+                    <p style="margin-bottom:2rem;">The extracted flash component was then mounted into a custom chip reader array. After mapping out the data channels and matching sector alignments, the raw binary configuration was cleanly imaged, revealing an unencrypted root file architecture for firmware evaluation.</p>
+                    <div style="font-family:monospace; font-size:0.85rem; color:var(--accent-neon);">[ INTEL: ROOT FILESYSTEM RECOVERED // ENCLOSURE INTEGRITY PRESERVED ]</div>
+                </div>
+
+                <div class="interactive-card" style="padding:4rem 3rem;">
+                    <div class="card-index">CASE_LOG #389 // PROTOCOL ANALYSIS</div>
+                    <h3 style="font-size:1.8rem; margin-bottom:1rem; color:white;">Automotive ECU Diagnostic Bus Interception</h3>
+                    <p style="margin-bottom:2rem;">This project involved analyzing communication patterns across high-frequency engine control units (ECUs). The circuit board paths were carefully monitored to locate unshielded logic test points located outside the controller's main protective casing.</p>
+                    <p style="margin-bottom:2rem;">Using ultra-fine micro-probing rigs, those processing tracks were securely connected to a calibrated 16-channel logic analyzer array. By analyzing live startup handshake sequences, custom diagnostic protocols were mapped out, providing clean insights into internal device command structures.</p>
+                    <div style="font-family:monospace; font-size:0.85rem; color:var(--accent-neon);">[ INTEL: COMMAND LAYOUT STRUCTURED // LIVE PROTOCOL STREAM VERIFIED ]</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="contact" class="spa-page container">
+        <section style="border:none; padding-top:0;">
+            <h2 class="section-header-title">Secure <span>Comms Terminal</span></h2>
+            <div class="grid-2">
+                <div class="about-text">
+                    <p class="highlight-text">Establish a direct communication path for hardware inquiries.</p>
+                    <p>Use this secure terminal interface to submit detailed component teardown requests, hardware engineering queries, or structural circuit architecture consultations.</p>
+                    <p>All data traffic sent through this input field is handled locally via vanilla string parsing frameworks, ensuring your parameters route smoothly without loading bloated external trackers or scripts.</p>
+                </div>
+                <div class="image-viewport" style="height:300px;">
+                    <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80" alt="Silicon Architecture Close-up">
+                </div>
+            </div>
+
+            <form class="contact-form-layout" onsubmit="event.preventDefault(); alert('Transmission Authenticated.');">
+                <div class="form-row">
+                    <div class="field-group">
+                        <label>Operator Callsign / Identity</label>
+                        <input type="text" placeholder="e.g., Lead Engineer" required>
+                    </div>
+                    <div class="field-group">
+                        <label>Secure Return Routing Endpoint (Email)</label>
+                        <input type="email" placeholder="name@domain.com" required>
+                    </div>
+                </div>
+                <div class="form-row" style="grid-template-columns: 1fr;">
+                    <div class="field-group">
+                        <label>Target Component Specifications (Subject)</label>
+                        <input type="text" placeholder="e.g., Multi-layer PCB Debugging Matrix" required>
+                    </div>
+                </div>
+                <div class="form-row" style="grid-template-columns: 1fr;">
+                    <div class="field-group">
+                        <label>Diagnostic Payload / Project Outline</label>
+                        <textarea rows="6" placeholder="Describe the hardware architecture challenges, component layouts, or extraction specifications in detail..." required></textarea>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Transmit Signal Data</button>
+            </form>
+        </section>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Silicon Deconstruct Portfolio. Built on Pure Vanilla Architecture Components.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const navButtons = document.querySelectorAll('.nav-btn');
+            const pages = document.querySelectorAll('.spa-page');
+            const actionButtons = document.querySelectorAll('.navigate-action-btn');
+
+            function switchPage(targetPageId) {
+                // Clear active layout states from navigation buttons and pages
+                pages.forEach(page => page.classList.remove('active-page'));
+                navButtons.forEach(btn => btn.classList.remove('active'));
+
+                const targetPage = document.getElementById(targetPageId);
+                const targetBtn = document.querySelector(`[data-target="${targetPageId}"]`);
+
+                if (targetPage) {
+                    targetPage.classList.add('active-page');
+                    // Instantly scroll the browser viewport back to the top anchor for clean view transitions
+                    window.scrollTo({ top: 0, behavior: 'instant' }); 
+                }
+                if (targetBtn) {
+                    targetBtn.classList.add('active');
+                }
+            }
+
+            // Hook Event Listeners into Top Navigation Buttons
+            navButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const target = button.getAttribute('data-target');
+                    switchPage(target);
+                });
+            });
+
+            // Hook Event Listeners into Embedded Content Buttons (CTA Links)
+            actionButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const destination = btn.getAttribute('data-dest');
+                    switchPage(destination);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
